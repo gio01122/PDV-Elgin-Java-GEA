@@ -1,114 +1,80 @@
-/*
-Projeto Final - PDV Simples com integração Elgin (versão pronta para testes)
-Arquivo: Projeto_Final_PDV_Elgin_Complete.java
-
-RESUMO
-------
-Este arquivo contém um exemplo completo em Java de um PDV (menu interativo)
-que utiliza JNA para chamar uma DLL/SDK da Elgin. O objetivo é cumprir os
-requisitos do projeto: usar as funções obrigatórias da biblioteca Elgin,
-usar laços de repetição, condicionais e organizar a lógica em funções próprias.
-
-IMPORTANTE
-----------
-1) Antes de executar, revise o caminho da DLL em `ImpressoraDLL.INSTANCE`.
-   Em muitos setups a chamada correta é usar apenas o nome da biblioteca
-   (sem caminho) e deixá-la no PATH ou no diretório do projeto. No entanto,
-   este exemplo mantém a abordagem de usar o caminho absoluto conforme seu
-   código inicial.
-
-2) Substitua valores default (baudrate, porta, parâmetros) conforme a sua
-   impressora. Consulte a documentação Elgin fornecida pelo professor.
-
-3) O código usa JFileChooser para selecionar arquivos XML (opções 6 e 7).
-
-4) As funções da DLL retornam inteiros. Neste exemplo, assumimos que
-   retorno == 0 indica sucesso. Ajuste conforme a especificação da sua DLL.
-
-COMO USAR
---------
-1. Abra este arquivo em sua IDE (IntelliJ).
-2. Adicione a dependência JNA no classpath (JAR). No Maven: groupId=net.java.dev.jna.
-3. Ajuste o caminho da DLL se necessário.
-4. Rode a classe Main.
-
-
---- README resumido (coloque em README.md no GitHub) ---
-# PDV Simples - Integração com Impressora Elgin
-
-Este repositório contém um PDV simplificado em Java que demonstra a
-integração com impressoras Elgin via DLL usando JNA. O sistema possui um
-menu interativo com funções como imprimir texto, QR code, código de barras,
-abrir gaveta, emitir sinal sonoro, avançar papel, cortar papel e imprimir
-XML SAT e XML de cancelamento.
-
-Funções Elgin usadas (obrigatórias):
-- AbreConexaoImpressora
-- FechaConexaoImpressora
-- ImpressaoTexto
-- Corte
-- ImpressaoQRCode
-- ImpressaoCodigoBarras
-- AvancaPapel
-- AbreGavetaElgin
-- AbreGaveta
-- SinalSonoro
-- ImprimeXMLSAT
-- ImprimeXMLCancelamentoSAT
-
-
-FIM DO CABEÇALHO
-*/
-
 import com.sun.jna.Library;
 import com.sun.jna.Native;
+
+import java.awt.*;
+import java.sql.SQLOutput;
 import java.util.Scanner;
 import javax.swing.JFileChooser;
+import javax.swing.plaf.PanelUI;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.io.FileInputStream;
-import java.io.InputStream;
-import java.io.ByteArrayOutputStream;
 
 public class Main {
 
     // Interface que representa a DLL, usando JNA
     public interface ImpressoraDLL extends Library {
-        // ATENÇÃO: ajuste o caminho/nome da DLL conforme seu ambiente.
+
+        // Caminho completo para a DLL
         ImpressoraDLL INSTANCE = (ImpressoraDLL) Native.load(
-                // Exemplo de caminho absoluto (substitua se necessário):
-                "C:\\Users\\richard.spanhol\\Downloads\\Java-Aluno Graduacao\\E1_Impressora01.dll",
+                "C:\\Users\\giova\\OneDrive\\Documentos\\FACULDADE\\Java-Aluno Graduacao\\untitled\\E1_Impressora01.dll",
                 ImpressoraDLL.class
         );
 
-        // Prototipos das funções (conforme sua assinatura na DLL)
+
+        private static String lerArquivoComoString(String path) throws IOException {
+            FileInputStream fis = new FileInputStream(path);
+            byte[] data = fis.readAllBytes();
+            fis.close();
+            return new String(data, StandardCharsets.UTF_8);
+        }
+
+
         int AbreConexaoImpressora(int tipo, String modelo, String conexao, int param);
+
         int FechaConexaoImpressora();
+
         int ImpressaoTexto(String dados, int posicao, int estilo, int tamanho);
+
         int Corte(int avanco);
+
         int ImpressaoQRCode(String dados, int tamanho, int nivelCorrecao);
+
         int ImpressaoCodigoBarras(int tipo, String dados, int altura, int largura, int HRI);
+
         int AvancaPapel(int linhas);
+
         int StatusImpressora(int param);
-        int AbreGavetaElgin();
+
+        int AbreGavetaElgin(int pino, int ti, int tf);
+
         int AbreGaveta(int pino, int ti, int tf);
+
         int SinalSonoro(int qtd, int tempoInicio, int tempoFim);
+
         int ModoPagina();
+
         int LimpaBufferModoPagina();
+
         int ImprimeModoPagina();
+
         int ModoPadrao();
+
         int PosicaoImpressaoHorizontal(int posicao);
+
         int PosicaoImpressaoVertical(int posicao);
+
         int ImprimeXMLSAT(String dados, int param);
+
         int ImprimeXMLCancelamentoSAT(String dados, String assQRCode, int param);
     }
 
     private static boolean conexaoAberta = false;
-    private static int tipo = 1; // 1=USB,2=Serial,3=Ethernet (default USB)
-    private static String modelo = "i9";
-    private static String conexao = "USB";
-    private static int parametro = 0;
+    private static int tipo;
+    private static String modelo;
+    private static String conexao;
+    private static int parametro;
 
     private static final Scanner scanner = new Scanner(System.in);
 
@@ -117,302 +83,346 @@ public class Main {
         return scanner.nextLine();
     }
 
-    // ---------------------- FUNÇÃO DE LEITURA DE ARQUIVOS ----------------------
-    // Utilitária para ler arquivo inteiro como String (UTF-8)
-    private static String lerArquivoComoString(String path) throws IOException {
-        try (InputStream is = new FileInputStream(path);
-             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-            byte[] buffer = new byte[4096];
-            int read;
-            while ((read = is.read(buffer)) != -1) {
-                baos.write(buffer, 0, read);
-            }
-            return new String(baos.toByteArray(), StandardCharsets.UTF_8);
-        }
-    }
-
-    // ---------------------- CONFIGURAÇÃO E CONEXÃO ----------------------
     public static void configurarConexao() {
-        System.out.println("\n--- CONFIGURAÇÃO DA CONEXÃO ---");
-        try {
-            String tipoStr = capturarEntrada("Tipo de conexão (1=USB, 2=Serial, 3=Ethernet) [padrão 1]: ");
-            if (!tipoStr.isBlank()) tipo = Integer.parseInt(tipoStr.trim());
-        } catch (Exception e) {
-            System.out.println("Entrada inválida para tipo. Mantendo padrão: " + tipo);
-        }
-
-        String modeloInput = capturarEntrada("Modelo da impressora (ex: i9) [padrão i9]: ");
-        if (!modeloInput.isBlank()) modelo = modeloInput.trim();
-
-        if (tipo == 1) { // USB
-            conexao = "USB";
-            parametro = 0;
-            System.out.println("Configurado para USB.");
-        } else if (tipo == 2) { // Serial
-            String porta = capturarEntrada("Digite a porta serial (ex: COM3): ");
-            if (!porta.isBlank()) conexao = porta.trim();
-            // Poderíamos pedir baudrate; usar 115200 como valor comum
-            try {
-                String p = capturarEntrada("Baudrate (ex: 115200) [padrão 115200]: ");
-                parametro = p.isBlank() ? 115200 : Integer.parseInt(p.trim());
-            } catch (Exception e) {
-                parametro = 115200;
-            }
-            System.out.println("Configurado para Serial: " + conexao + " @" + parametro);
-        } else if (tipo == 3) { // Ethernet
-            String ip = capturarEntrada("Digite o IP da impressora (ex: 192.168.0.100): ");
-            if (!ip.isBlank()) conexao = ip.trim();
-            try {
-                String p = capturarEntrada("Porta TCP (ex: 9100) [padrão 9100]: ");
-                parametro = p.isBlank() ? 9100 : Integer.parseInt(p.trim());
-            } catch (Exception e) {
-                parametro = 9100;
-            }
-            System.out.println("Configurado para Ethernet: " + conexao + ":" + parametro);
-        } else {
-            System.out.println("Tipo desconhecido. Mantendo configuração anterior.");
-        }
+        System.out.println("**** Configuração da impressora ****");
+        tipo = Integer.parseInt(capturarEntrada("1 - USB\n" +
+                "2 - RS2322\n" +
+                "3 - TCP/IP\n" +
+                "4 - Bluetooth\n" +
+                "5 - Impressoras acopladas(Android)\n " +
+                "Escolha o tipo da impressoara: "));
+        modelo = capturarEntrada("Escolha o modelo: ");
+        conexao = capturarEntrada("Informe o tipo de conexão\n" +
+                "USB - USB\n" +
+                "RS232 - COM2\n" +
+                "TCP/IP - 192.168.0.20\n" +
+                "Bluetooth - AA:BB:CC:DD:EE:FF\n" +
+                "Escolha: ");
+        parametro = Integer.parseInt(capturarEntrada("Informe o parametro: "));
+        System.out.println("Configuração salva!");
     }
 
     public static void abrirConexao() {
         if (conexaoAberta) {
-            System.out.println("Conexão já aberta.");
+            System.out.println("Conexão já aberta!");
             return;
         }
-        System.out.println("Tentando abrir conexão...\nTipo: " + tipo + " Modelo: " + modelo + " Conexão: " + conexao + " Param: " + parametro);
-        int ret = -1;
-        try {
-            ret = ImpressoraDLL.INSTANCE.AbreConexaoImpressora(tipo, modelo, conexao, parametro);
-        } catch (UnsatisfiedLinkError ule) {
-            System.out.println("Erro ao chamar a DLL. Verifique o caminho e a presença da DLL: " + ule.getMessage());
-            return;
-        } catch (Throwable t) {
-            System.out.println("Erro inesperado ao abrir conexão: " + t.getMessage());
-            return;
-        }
-
-        // Assumimos que 0 = sucesso (verifique sua DLL)
-        if (ret == 0) {
+        int resultado = ImpressoraDLL.INSTANCE.AbreConexaoImpressora(tipo, modelo, conexao, parametro);
+        if (resultado == 0) {
             conexaoAberta = true;
-            System.out.println("Conexão aberta com sucesso.");
+            System.out.println("Conexão aberta!");
         } else {
-            System.out.println("Falha ao abrir conexão. Código de retorno: " + ret);
+            System.out.println("Erro ao abrir a conexão. Codigo: " + resultado);
         }
     }
 
     public static void fecharConexao() {
-        if (!conexaoAberta) {
-            System.out.println("Nenhuma conexão aberta.");
+        if (conexaoAberta == false) {
+            System.out.println("Nenhuma conexão aberta!");
             return;
         }
-        try {
-            int ret = ImpressoraDLL.INSTANCE.FechaConexaoImpressora();
-            if (ret == 0) {
-                System.out.println("Conexão fechada com sucesso.");
-            } else {
-                System.out.println("Fechamento retornou código: " + ret + " (verificar)");
-            }
-        } catch (Throwable t) {
-            System.out.println("Erro ao fechar conexão: " + t.getMessage());
-        } finally {
+        int resultado = ImpressoraDLL.INSTANCE.FechaConexaoImpressora();
+        if (resultado == 0) {
             conexaoAberta = false;
+            System.out.println("Conexão fechada!");
+            break;
+        } else {
+            System.out.println("Erro ao fechar a conexão! Erro: " + resultado);
         }
     }
 
-    // ---------------------- AÇÕES PRINCIPAIS (MENU) ----------------------
-    public static void main(String[] args) {
-        boolean sair = false;
+    public static void ImpressaoTexto() {
 
-        while (!sair) {
-            printMenu();
+        if (conexaoAberta) {
+
+            System.out.println("Texto a ser impresso: ");
+            String dados = scanner.nextLine();
+            int resultado = ImpressoraDLL.INSTANCE.ImpressaoTexto(dados, 1, 4, 0);
+
+            if (resultado == 0) {
+                System.out.println("Impressão concluida");
+            } else {
+                System.out.println("Erro na impressão. Erro: " + resultado);
+            }
+        } else {
+            System.out.println("Conexão não iniciada!");
+            return;
+        }
+    }
+
+    public static void corte() {
+        ImpressoraDLL.INSTANCE.Corte(2);
+    }
+
+    public static void AvancaPapel() {
+        ImpressoraDLL.INSTANCE.AvancaPapel(2);
+    }
+
+    public static void ImpressaoQRCode() {
+        if (conexaoAberta) {
+
+            System.out.println("Insira oque deseja no QRCode");
+            String dados = scanner.nextLine();
+
+            int resultado = ImpressoraDLL.INSTANCE.ImpressaoQRCode(dados, 6, 4);
+
+            if (resultado == 0) {
+                System.out.printf("Impressão realizada com sucesso");
+            } else {
+                System.out.printf("Poblema ao imprimir! Erro: " + resultado);
+            }
+
+        } else {
+            System.out.println("Conexão não iniciada!");
+            return;
+        }
+    }
+
+    public static void ImpressaoCodigodeBarras() {
+        if (conexaoAberta) {
+
+            int resultado = ImpressoraDLL.INSTANCE.ImpressaoCodigoBarras(8, "{A012345678912", 100, 2, 3);
+
+            if (resultado == 0) {
+                System.out.printf("Codigo de barras immpresso com sucesso!");
+            } else {
+                System.out.printf("Erro ao imprimir codigo de barras! Erro: " + resultado);
+            }
+        }else {
+            System.out.println("Conexão não iniciada!");
+            return;
+        }
+    }
+
+    public static String LerArquivoComoString(File aqrivo) throws IOException {
+        FileInputStream fis = new FileInputStream(aqrivo);
+        byte[] dados = fis.readAllBytes();
+        fis.close();
+        return new String(dados, StandardCharsets.UTF_8);
+    }
+
+    public static void ImprimeXMLSAT() {
+        if (conexaoAberta) {
+            JFileChooser chooser = new JFileChooser("");
+            chooser.setDialogTitle("Selecione o arquivo a ser impresso");
+
+            int retorno = chooser.showOpenDialog(null);
+
+            if (retorno == JFileChooser.APPROVE_OPTION) {
+                File arquivo = chooser.getSelectedFile();
+
+                try {
+                    String xmlconteudo = LerArquivoComoString(arquivo);
+
+                    int resultado = ImpressoraDLL.INSTANCE.ImprimeXMLSAT(xmlconteudo, 0);
+
+                    if (resultado == 0) {
+                        System.out.println("Arquivo impresso com sucesso!");
+                    } else {
+                        System.out.println("Erro ao imprimir o arquivo! Erro: " + resultado);
+                    }
+                } catch (IOException e) {
+                    System.out.println("Erro ao ler o arquivo: " + e.getMessage());
+                }
+            } else {
+                System.out.println("Arquivo não selecionado!");
+            }
+        } else {
+            System.out.println("Conexão não iniciada!");
+        }
+    }
+
+
+    public static void ImprimeXMLCancelamentoSAT() {
+        if (conexaoAberta) {
+
+            JFileChooser chooser = new JFileChooser("");
+            chooser.setDialogTitle("Selecione o arqivo ser impresso");
+            int retorno = chooser.showOpenDialog(null);
+
+            if (retorno == JFileChooser.APPROVE_OPTION) {
+                File arquivo = chooser.getSelectedFile();
+                try {
+                    String xmlConteudo = LerArquivoComoString(arquivo);
+
+                    String assQRCode = "Q5DLkpdRijIRGY6YSSNsTWK1TztHL1vD0V1Jc4spo/CEUqICEb9SFy82ym8EhBRZjbh3btsZhF+sjHqEMR159i4agru9x6KsepK/q0E2e5xlU5cv3m1woYfgHyOkWDNcSdMsS6bBh2Bpq6s89yJ9Q6qh/J8YHi306ce9Tqb/drKvN2XdE5noRSS32TAWuaQEVd7u+TrvXlOQsE3fHR1D5f1saUwQLPSdIv01NF6Ny7jZwjCwv1uNDgGZONJdlTJ6p0ccqnZvuE70aHOI09elpjEO6Cd+orI7XHHrFCwhFhAcbalc+ZfO5b/+vkyAHS6CYVFCDtYR9Hi5qgdk31v23w==";
+
+
+                    int resultado = ImpressoraDLL.INSTANCE.ImprimeXMLCancelamentoSAT(xmlConteudo, assQRCode, 0);
+
+                    if (retorno == 0) {
+                        System.out.printf("Arquivo impresso!");
+                    } else {
+                        System.out.printf("Erro ao imprimir arquivo! Erro: " + resultado);
+                    }
+                } catch (IOException e) {
+                    System.out.printf("Erro ao ler arquvio! Erro: " + e.getMessage());
+                }
+            } else {
+                System.out.printf("Arquivo não selecionado!");
+            }
+
+        } else {
+            System.out.println("Conexão não iniciada!");
+            return;
+        }
+    }
+
+    public static void AbreGavetaElgin() {
+        if (conexaoAberta) {
+            int resultadao = ImpressoraDLL.INSTANCE.AbreGavetaElgin(1, 50, 50);
+
+            if (resultadao == 0) {
+                System.out.printf("Gaveta aberta com sucesso");
+            } else {
+                System.out.printf("Erro ao abrir a gaveta! Erro: " + resultadao);
+            }
+        } else {
+            System.out.printf("Conexão não iniciada");
+            return;
+        }
+
+    }
+
+    public static void AbreGaveta() {
+        if (conexaoAberta) {
+
+            int resultado = ImpressoraDLL.INSTANCE.AbreGaveta(1, 5, 10);
+
+            if (resultado == 0) {
+                System.out.printf("Gaveta aberta com sucesso");
+            } else {
+                System.out.printf("Erro ao abrir a gaveta! Erro: " + resultado);
+            }
+        } else {
+            System.out.printf("Conexão não iniciada!");
+            return;
+        }
+    }
+
+    public static void SinalSonoro() {
+        if (conexaoAberta) {
+            int resultado = ImpressoraDLL.INSTANCE.SinalSonoro(4, 5, 5);
+
+            if (resultado == 0) {
+                System.out.printf("Sinal emitido com sucesso");
+            } else {
+                System.out.printf("Erro ao emitir o sinal! Erro: " + resultado);
+            }
+
+        } else {
+            System.out.printf("Conexão não iniciada!");
+            return;
+        }
+    }
+
+    public static void main(String[] args) {
+        while (true) {
+            System.out.println("\n*************************************************");
+            System.out.println("**************** MENU IMPRESSORA ******************");
+            System.out.println("*************************************************\n");
+            System.out.println("1  - Configurar Conexao");
+            System.out.println("2  - Abrir Conexao");
+            System.out.println("3  - Impressao Texto");
+            System.out.println("4  - Impressao QRCode");
+            System.out.println("5  - Impressao Cod Barras");
+            System.out.println("6  - Impressao XML SAT");
+            System.out.println("7  - Impressao XML Canc SAT");
+            System.out.println("8  - Abrir Gaveta Elgin");
+            System.out.println("9  - Abrir Gaveta");
+            System.out.println("10 - Sinal Sonoro");
+            System.out.println("0  - Fechar Conexao e Sair");
+            System.out.println("--------------------------------------");
+
             String escolha = capturarEntrada("\nDigite a opção desejada: ");
+
+            if (escolha.equals("0")) {
+
+            }
 
             switch (escolha) {
                 case "1":
                     configurarConexao();
                     break;
-
                 case "2":
                     abrirConexao();
                     break;
-
-                case "3": // Impressao Texto
-                    if (!validaConexao()) break;
-                    String texto = capturarEntrada("Digite o texto a ser impresso: ");
-                    try {
-                        int r = ImpressoraDLL.INSTANCE.ImpressaoTexto(texto, 0, 0, 0);
-                        System.out.println("Retorno ImpressaoTexto: " + r);
-                    } catch (Throwable t) {
-                        System.out.println("Erro ImpressaoTexto: " + t.getMessage());
-                    }
+                case "3":
+                    ImpressaoTexto();
+                    corte();
+                    AvancaPapel();
                     break;
 
-                case "4": // Impressao QRCode
-                    if (!validaConexao()) break;
-                    String conteudoQR = capturarEntrada("Conteúdo do QR Code: ");
-                    try {
-                        int r = ImpressoraDLL.INSTANCE.ImpressaoQRCode(conteudoQR, 4, 2);
-                        System.out.println("Retorno ImpressaoQRCode: " + r);
-                    } catch (Throwable t) {
-                        System.out.println("Erro ImpressaoQRCode: " + t.getMessage());
-                    }
+                case "4":
+                    ImpressaoQRCode();
+                    AvancaPapel();
+                    corte();
                     break;
 
-                case "5": // Impressao Codigo de Barras
-                    if (!validaConexao()) break;
-                    String codigoBarras = capturarEntrada("Código numérico para barras: ");
-                    try {
-                        // tipo 4 = CODE128 por exemplo (ajuste conforme sua DLL)
-                        int r = ImpressoraDLL.INSTANCE.ImpressaoCodigoBarras(4, codigoBarras, 120, 2, 0);
-                        System.out.println("Retorno ImpressaoCodigoBarras: " + r);
-                    } catch (Throwable t) {
-                        System.out.println("Erro ImpressaoCodigoBarras: " + t.getMessage());
-                    }
+                case "5":
+                    ImpressaoCodigodeBarras();
+                    corte();
+                    AvancaPapel();
                     break;
 
-                case "6": // Impressao XML SAT (venda)
-                    if (!validaConexao()) break;
-                    System.out.println("Selecione o arquivo XML de venda (janela será aberta)...");
-                    JFileChooser chooser = new JFileChooser();
-                    int escolhaArquivo = chooser.showOpenDialog(null);
-                    if (escolhaArquivo == JFileChooser.APPROVE_OPTION) {
-                        File arquivo = chooser.getSelectedFile();
-                        try {
-                            String xml = lerArquivoComoString(arquivo.getAbsolutePath());
-                            int r = ImpressoraDLL.INSTANCE.ImprimeXMLSAT(xml, 0);
-                            System.out.println("Retorno ImprimeXMLSAT: " + r);
-                        } catch (IOException e) {
-                            System.out.println("Erro lendo o arquivo: " + e.getMessage());
-                        } catch (Throwable t) {
-                            System.out.println("Erro ImprimeXMLSAT: " + t.getMessage());
-                        }
-                    } else {
-                        System.out.println("Nenhum arquivo selecionado.");
-                    }
+                case "6":
+                    // --- IMPORTANTE ---
+                    // Este trecho permite ao usuário escolher um arquivo XML no computador.
+                    // Para funcionar, será necessário importar as classes de manipulação de arquivos e da interface gráfica:
+                    // import java.io.*;                    // Para trabalhar com arquivos (ex: File, IOException)
+                    // import javax.swing.*;                // Para usar o JFileChooser (janela de seleção de arquivos)
+                    //
+                    // A ideia: abrir uma janela para o usuário escolher o XML, ler o conteúdo do arquivo
+                    // e enviar para a função que imprime o XML de cancelamento do SAT.
+                    //
+                    // >>> Os alunos deverão implementar as partes de leitura do arquivo (função lerArquivoComoString)
+                    // e o controle de fluxo (switch/case, etc) conforme aprendido em aula.
+
+                    ImprimeXMLSAT();
+                    corte();
+                    AvancaPapel();
+                    break;
+                case "7":
+                    // --- IMPORTANTE ---
+                    // Este trecho permite ao usuário escolher um arquivo XML no computador.
+                    // Para funcionar, será necessário importar as classes de manipulação de arquivos e da interface gráfica:
+                    // import java.io.*;                    // Para trabalhar com arquivos (ex: File, IOException)
+                    // import javax.swing.*;                // Para usar o JFileChooser (janela de seleção de arquivos)
+                    //
+                    // A ideia: abrir uma janela para o usuário escolher o XML, ler o conteúdo do arquivo
+                    // e enviar para a função que imprime o XML de cancelamento do SAT.
+                    //
+                    // >>> Os alunos deverão implementar as partes de leitura do arquivo (função lerArquivoComoString)
+                    // e o controle de fluxo (switch/case, etc) conforme aprendido em aula.
+
+
+                    ImprimeXMLCancelamentoSAT();
+                    AvancaPapel();
+                    corte();
                     break;
 
-                case "7": // Impressao XML Cancelamento SAT
-                    if (!validaConexao()) break;
-                    System.out.println("Selecione o arquivo XML de cancelamento (janela será aberta)...");
-                    JFileChooser chooser2 = new JFileChooser();
-                    int escolhaArquivo2 = chooser2.showOpenDialog(null);
-                    if (escolhaArquivo2 == JFileChooser.APPROVE_OPTION) {
-                        File arquivo = chooser2.getSelectedFile();
-                        try {
-                            String xmlCanc = lerArquivoComoString(arquivo.getAbsolutePath());
-                            String assQRCode = capturarEntrada("Digite o texto do QR Code/assinatura (se houver): ");
-                            int r = ImpressoraDLL.INSTANCE.ImprimeXMLCancelamentoSAT(xmlCanc, assQRCode, 0);
-                            System.out.println("Retorno ImprimeXMLCancelamentoSAT: " + r);
-                        } catch (IOException e) {
-                            System.out.println("Erro lendo o arquivo: " + e.getMessage());
-                        } catch (Throwable t) {
-                            System.out.println("Erro ImprimeXMLCancelamentoSAT: " + t.getMessage());
-                        }
-                    } else {
-                        System.out.println("Nenhum arquivo selecionado.");
-                    }
+                case "8":
+                    AbreGavetaElgin();
                     break;
 
-                case "8": // Abrir Gaveta Elgin
-                    if (!validaConexao()) break;
-                    try {
-                        int r = ImpressoraDLL.INSTANCE.AbreGavetaElgin();
-                        System.out.println("Retorno AbreGavetaElgin: " + r);
-                    } catch (Throwable t) {
-                        System.out.println("Erro AbreGavetaElgin: " + t.getMessage());
-                    }
+                case "9":
+                    AbreGaveta();
                     break;
 
-                case "9": // Abrir Gaveta (generic)
-                    if (!validaConexao()) break;
-                    try {
-                        // pino, ti, tf -> parâmetros típicos (ajuste conforme sua impressora)
-                        int r = ImpressoraDLL.INSTANCE.AbreGaveta(0, 100, 100);
-                        System.out.println("Retorno AbreGaveta: " + r);
-                    } catch (Throwable t) {
-                        System.out.println("Erro AbreGaveta: " + t.getMessage());
-                    }
-                    break;
-
-                case "10": // Sinal Sonoro
-                    if (!validaConexao()) break;
-                    try {
-                        int r = ImpressoraDLL.INSTANCE.SinalSonoro(3, 50, 50);
-                        System.out.println("Retorno SinalSonoro: " + r);
-                    } catch (Throwable t) {
-                        System.out.println("Erro SinalSonoro: " + t.getMessage());
-                    }
-                    break;
-
-                case "11": // Avancar papel (opcional: adicione ao menu se desejar)
-                    if (!validaConexao()) break;
-                    try {
-                        String l = capturarEntrada("Quantas linhas avançar? [padrão 3]: ");
-                        int linhas = l.isBlank() ? 3 : Integer.parseInt(l.trim());
-                        int r = ImpressoraDLL.INSTANCE.AvancaPapel(linhas);
-                        System.out.println("Retorno AvancaPapel: " + r);
-                    } catch (Throwable t) {
-                        System.out.println("Erro AvancaPapel: " + t.getMessage());
-                    }
-                    break;
-
-                case "12": // Corte (opcional)
-                    if (!validaConexao()) break;
-                    try {
-                        String a = capturarEntrada("Tipo de corte (0=parcial,1=total) [padrão 1]: ");
-                        int avanco = a.isBlank() ? 1 : Integer.parseInt(a.trim());
-                        int r = ImpressoraDLL.INSTANCE.Corte(avanco);
-                        System.out.println("Retorno Corte: " + r);
-                    } catch (Throwable t) {
-                        System.out.println("Erro Corte: " + t.getMessage());
-                    }
+                case "10":
+                    SinalSonoro();
                     break;
 
                 case "0":
-                    System.out.println("Fechando conexão (se aberta) e saindo...");
                     fecharConexao();
-                    sair = true;
                     break;
 
                 default:
-                    System.out.println("Opção inválida. Tente novamente.");
-                    break;
+                    System.out.println("Escolha invalida, tente novamente!");
+
             }
-
-            System.out.println();
         }
-
-        // Fecha scanner antes de encerrar
-        scanner.close();
-        System.out.println("Aplicação finalizada.");
     }
 
-    private static void printMenu() {
-        System.out.println("\n*************************************************");
-        System.out.println("**************** MENU IMPRESSORA *******************");
-        System.out.println("*************************************************\n");
 
-        System.out.println("1  - Configurar Conexao");
-        System.out.println("2  - Abrir Conexao");
-        System.out.println("3  - Impressao Texto");
-        System.out.println("4  - Impressao QRCode");
-        System.out.println("5  - Impressao Cod Barras");
-        System.out.println("6  - Impressao XML SAT");
-        System.out.println("7  - Impressao XML Canc SAT");
-        System.out.println("8  - Abrir Gaveta Elgin");
-        System.out.println("9  - Abrir Gaveta");
-        System.out.println("10 - Sinal Sonoro");
-        System.out.println("11 - Avancar Papel (opcional)");
-        System.out.println("12 - Corte (opcional)");
-        System.out.println("0  - Fechar Conexao e Sair");
-        System.out.println("--------------------------------------");
-    }
-
-    private static boolean validaConexao() {
-        if (!conexaoAberta) {
-            System.out.println("Impressora não conectada. Abra a conexão primeiro (opção 2).");
-            return false;
-        }
-        return true;
-    }
 }
