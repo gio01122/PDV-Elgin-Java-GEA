@@ -1,52 +1,39 @@
-# 🧾 Projeto Final — PDV com Impressora Elgin (Java + JNA)
+# Projeto Final — PDV com Impressora Elgin (Java + JNA)
 
-## 📚 Sobre o Projeto
+## Sobre o Projeto
 
-Este projeto implementa um **PDV (Ponto de Venda) Simplificado**, totalmente funcional e integrado a impressoras térmicas **Elgin**, utilizando:
+Este projeto implementa um PDV (Ponto de Venda) simplificado utilizando Java, integrado a impressoras térmicas Elgin por meio da biblioteca nativa disponibilizada pelo fabricante. A comunicação com a impressora é feita através da DLL da Elgin, acessada pelo Java usando a biblioteca JNA.
 
-* Linguagem **Java**
-* Biblioteca **JNA (Java Native Access)** para acessar funções nativas da DLL
-* **DLL oficial da Elgin** para comunicação direta com a impressora
-* Leitura de XML via **JFileChooser**
+O sistema possui um menu interativo no console que permite realizar ações como impressão de texto, impressão de QR Code, códigos de barras, abertura de gaveta, corte de papel, emissão de sinal sonoro e impressão de XML SAT e XML de cancelamento.
 
-O sistema é baseado em um **menu interativo**, permitindo operações essenciais de automação comercial, como impressão de texto, QR Code, códigos de barras, abrir gaveta, emitir sinal sonoro, avançar papel, cortar papel e imprimir XML de SAT.
-
-Este README foi preparado para submissão em **GitHub**, seguindo boas práticas de documentação.
-
----
-
-# 📁 Estrutura do Projeto
+## Estrutura do Projeto
 
 ```
-/Projeto_PDV_Elgin
+Projeto_PDV_Elgin/
 │
 ├── libs/
-│   ├── jna-5.15.0.jar           # Biblioteca JNA
-│   ├── E1_Impressora01.dll      # DLL da impressora Elgin
+│   ├── jna-5.15.0.jar
+│   ├── E1_Impressora01.dll
 │
 ├── src/
-│   ├── Main.java                # Código-fonte completo do PDV
+│   └── Main.java
 │
 └── README.md
 ```
 
----
+## Tecnologias Utilizadas
 
-# 🔧 Tecnologias Utilizadas
+* Java 8 ou superior
+* JNA 5.15.0
+* DLL oficial da Elgin
+* Swing (JFileChooser) para seleção de arquivos XML
+* Scanner para entrada de dados pelo terminal
 
-* **Java 8+**
-* **JNA 5.15.0**
-* **DLL Elgin** (comandos nativos ESC/POS)
-* **Swing/JFileChooser** para selecionar XML SAT
-* **Scanner** (entrada via terminal)
+## Como Executar o Projeto
 
----
+### 1. Configuração da JNA no VSCode
 
-# ▶️ Como Executar o Projeto
-
-## 1️⃣ Instale a JNA no Classpath
-
-Crie o arquivo:
+Crie ou edite o arquivo:
 
 ```
 .vscode/settings.json
@@ -62,24 +49,22 @@ E adicione:
 }
 ```
 
-## 2️⃣ Coloque a DLL da Elgin na pasta `libs/`
+### 2. Coloque a DLL da Elgin na pasta `libs/`
 
-O código carrega a DLL automaticamente pelo caminho configurado no `Main.java`.
+A DLL é carregada no código pelo caminho configurado em `Native.load()`.
 
-## 3️⃣ Compile e execute
+### 3. Executando o projeto
 
-Se estiver no terminal:
+Pelo terminal:
 
 ```
 javac Main.java
 java Main
 ```
 
-Ou simplesmente rode pelo VSCode/IntelliJ.
+Ou utilizando o botão de execução da IDE.
 
----
-
-# 📟 Menu do Sistema
+## Menu do Sistema
 
 ```
 1  - Configurar Conexao
@@ -97,97 +82,54 @@ Ou simplesmente rode pelo VSCode/IntelliJ.
 0  - Fechar Conexao e Sair
 ```
 
----
+## Funções da Impressora Utilizadas
 
-# 🖨️ Funções da Impressora Utilizadas
+O projeto utiliza todas as funções exigidas pela atividade:
 
-Todas as funções obrigatórias da DLL foram implementadas:
+* AbreConexaoImpressora
+* FechaConexaoImpressora
+* ImpressaoTexto
+* ImpressaoQRCode
+* ImpressaoCodigoBarras
+* AvancaPapel
+* Corte
+* SinalSonoro
+* AbreGavetaElgin
+* AbreGaveta
+* ImprimeXMLSAT
+* ImprimeXMLCancelamentoSAT
 
-* `AbreConexaoImpressora()`
-* `FechaConexaoImpressora()`
-* `ImpressaoTexto()`
-* `ImpressaoQRCode()`
-* `ImpressaoCodigoBarras()`
-* `AvancaPapel()`
-* `Corte()`
-* `SinalSonoro()`
-* `AbreGavetaElgin()`
-* `AbreGaveta()`
-* `ImprimeXMLSAT()`
-* `ImprimeXMLCancelamentoSAT()`
+Essas funções são chamadas diretamente da DLL através das interfaces da JNA.
 
-Essas funções são chamadas diretamente da DLL via JNA.
+## Organização do Código
 
----
+* Funções de conexão: configuração, abertura e fechamento
+* Funções de impressão e ações da impressora
+* Funções auxiliares para leitura de XML e validação
+* Uso de `while` para manter o menu ativo
+* Tratamento de opções via `switch`
+* Tratamento de erros com `try/catch`
 
-# 📑 Detalhes de Implementação
+## Testando com Impressora Real
 
-## ✔ Organização do Código
+1. Conecte a impressora Elgin via USB, Serial ou Ethernet.
+2. Abra o programa.
+3. Configure a conexão (opção 1).
+4. Abra a conexão (opção 2).
+5. Teste as funções desejadas, como impressão de texto ou QR Code.
+6. Para impressão de XML, selecione um arquivo `.xml` quando solicitado.
 
-O código está dividido em:
+## Requisitos para Funcionamento
 
-* Funções de conexão (`configurarConexao`, `abrirConexao`, `fecharConexao`)
-* Funções de impressão
-* Funções auxiliares
-* Menu principal com laço `while`
-* Validação de conexão
+* Driver da impressora instalado
+* DLL da Elgin disponível
+* JNA corretamente configurada
+* Impressora conectada e reconhecida pelo sistema
 
-## ✔ Estruturas exigidas pela atividade
+## Licença
 
-O projeto utiliza:
+Projeto desenvolvido para fins acadêmicos.
 
-* **Laço de repetição `while`** para manter o menu ativo
-* **Condicionais `switch`** para tratar as opções
-* **Funções próprias** para cada operação
-* **Chamada de funções nativas via DLL**
-* **Tratamento de exceções** (try/catch)
+## Autor
 
----
-
-# 🧪 Testando com a Impressora Real
-
-1. Conecte a impressora Elgin via USB/Serial/Ethernet
-2. Execute o programa
-3. Selecione:
-
-```
-1 → Configurar Conexão
-2 → Abrir Conexão
-```
-
-4. Depois escolha:
-
-```
-3 → Imprimir Texto
-```
-
-5. Digite qualquer texto e ela imprimirá imediatamente.
-
-Para XML SAT:
-
-```
-6 → Impressao XML SAT
-```
-
-Será aberta uma janela para selecionar o arquivo `.xml`.
-
----
-
-# 📦 Requisitos para Impressão Real
-
-✔ Driver da impressora instalado
-✔ DLL fornecida pela Elgin
-✔ Configuração correta no menu (USB / Serial / IP)
-✔ JNA funcionando no projeto
-
----
-
-# 📄 Licença
-
-Este projeto é acadêmico e livre para uso educacional.
-
----
-
-# 👤 Autoria
-
-Projeto criado como entrega de atividade prática envolvendo integração com periféricos (impressora térmica) utilizando Java + DLL nativa.
+Projeto produzido como entrega de atividade prática envolvendo integração entre Java e periféricos utilizando DLL nativa da Elgin. Feito po Giovanna Dias Ferreira
